@@ -420,15 +420,13 @@ export default function Dashboard() {
             {/* Date & Total Row */}
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="sm:w-auto w-full flex justify-center sm:justify-start">
-                {!searchQuery && (
-                  <DateFilter
-                    dateRange={dateRange}
-                    setDateRange={setDateRange}
-                    filterMode={filterMode}
-                    setFilterMode={setFilterMode}
-                    hideModeToggle={false}
-                  />
-                )}
+                <DateFilter
+                  dateRange={dateRange}
+                  setDateRange={setDateRange}
+                  filterMode={filterMode}
+                  setFilterMode={setFilterMode}
+                  hideModeToggle={false}
+                />
               </div>
 
               {/* Total Card */}
