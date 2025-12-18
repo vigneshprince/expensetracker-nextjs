@@ -55,7 +55,7 @@ export default function DateFilter({ dateRange, setDateRange, filterMode, setFil
           <>
             <input
               type="month"
-                className="bg-transparent text-gray-900 px-1 sm:px-2 py-1 rounded text-xs sm:text-sm font-medium focus:ring-2 focus:ring-900 outline-none cursor-pointer min-w-[9.5rem] sm:min-w-0"
+                className="bg-transparent text-gray-900 px-1 sm:px-2 py-1 rounded text-xs sm:text-sm font-medium focus:ring-2 outline-none cursor-pointer min-w-[9.5rem] sm:min-w-0"
               value={isValid(dateRange.start) ? format(dateRange.start, 'yyyy-MM') : ''}
               onChange={(e) => {
                 if (!e.target.value) return;
@@ -66,7 +66,7 @@ export default function DateFilter({ dateRange, setDateRange, filterMode, setFil
               <span className="text-gray-400 text-xs font-medium shrink-0">to</span>
             <input
               type="month"
-                className="bg-transparent text-gray-900 px-1 sm:px-2 py-1 rounded text-xs sm:text-sm font-medium focus:ring-2 focus:ring-900 outline-none cursor-pointer min-w-[9.5rem] sm:min-w-0"
+                className="bg-transparent text-gray-900 px-1 sm:px-2 py-1 rounded text-xs sm:text-sm font-medium focus:ring-2 outline-none cursor-pointer min-w-[9.5rem] sm:min-w-0"
               value={isValid(dateRange.end) ? format(dateRange.end, 'yyyy-MM') : ''}
               onChange={(e) => {
                 if (!e.target.value) return;
