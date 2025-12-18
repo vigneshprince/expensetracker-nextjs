@@ -1,12 +1,18 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { collection, query, where, onSnapshot, getDocs, Timestamp, orderBy } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, getDocs, Timestamp, orderBy, deleteDoc, doc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { format, startOfMonth, endOfMonth, parseISO } from 'date-fns';
-import { ChevronDown, ChevronUp, Plus, RefreshCw, LogOut } from 'lucide-react';
+import { format, isSameMonth, parseISO, isSameDay, subMonths, startOfMonth, endOfMonth } from 'date-fns';
+import { ChevronDown, ChevronUp, Plus, RefreshCw, LogOut, Pencil, Trash2, Search, Calendar, CalendarRange, RotateCcw, PieChart as PieChartIcon } from 'lucide-react';
+import AnalyticsDashboard from './AnalyticsDashboard';
+import DateFilter from './DateFilter';
 import { useAuth } from './AuthProvider';
-import AddExpenseModal from './AddExpenseModal'; // We will create this next
+import Image from 'next/image';
+import AddExpenseModal from './AddExpenseModal';
+import { FileText as FileIcon } from 'lucide-react';
+import BillViewModal from './BillViewModal';
+import VoiceInput from './VoiceInput';
 
 interface ExpenseDetail {
   id: string;
@@ -15,6 +21,7 @@ interface ExpenseDetail {
   addedDate: Timestamp;
   notes: string;
   category?: string; // Legacy data might have it, or we join it
+  bill?: string[]; // Array of bill URLs
   // ... other fields
 }
 
@@ -39,17 +46,40 @@ interface GroupedExpense {
 
 export default function Dashboard() {
   const { user, logout } = useAuth();
-  const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [dateRange, setDateRange] = useState({
+    start: subMonths(new Date(), 3),
+    end: new Date()
+  });
+  const [filterMode, setFilterMode] = useState<'single' | 'range'>('range');
   const [groupedData, setGroupedData] = useState<GroupedExpense[]>([]);
   const [totalExpense, setTotalExpense] = useState(0);
   const [loading, setLoading] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingExpense, setEditingExpense] = useState<ExpenseDetail | null>(null);
+  const [initialModalData, setInitialModalData] = useState<any>(null); // For Voice Input Pre-fill
+  const [viewingBills, setViewingBills] = useState<string[]>([]);
+  const [isBillModalOpen, setIsBillModalOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
+
+  const [isAnalyticsOpen, setIsAnalyticsOpen] = useState(false); // Analytics State
+  const [rawExpenses, setRawExpenses] = useState<any[]>([]); // Flat data for analytics
+
+  const handleResetDate = () => {
+    const now = new Date();
+    setDateRange({ start: now, end: now });
+    if (!searchQuery) {
+      setFilterMode('single');
+    }
+  };
 
   // Cache for expenses and categories to avoid re-fetching constantly if they don't change often
   // But for now we fetch them once or on mount.
   const [expenseDefs, setExpenseDefs] = useState<ExpenseMain[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+
+  // Search State
+  const [searchQuery, setSearchQuery] = useState('');
+  const [allExpensesCache, setAllExpensesCache] = useState<ExpenseDetail[] | null>(null); // Cache for search
 
   useEffect(() => {
     setMounted(true);
@@ -69,10 +99,11 @@ export default function Dashboard() {
 
   useEffect(() => {
     if (expenseDefs.length === 0 || categories.length === 0) return;
+    if (searchQuery.trim()) return; // Skip if searching
 
     setLoading(true);
-    const start = startOfMonth(currentMonth);
-    const end = endOfMonth(currentMonth);
+    const start = startOfMonth(dateRange.start);
+    const end = endOfMonth(dateRange.end);
 
     // Query expenseDetails
     const q = query(
@@ -96,9 +127,12 @@ export default function Dashboard() {
           ...detail,
           expenseName: expenseDef?.name || 'Unknown',
           img: expenseDef?.img || '',
-          categoryName
+          categoryName,
+          category: categoryDef?.id // Ensure category ID is resolved for legacy data
         };
       });
+
+      setRawExpenses(processed); // Update raw data for analytics
 
       // Group by Category
       const groups: { [key: string]: GroupedExpense } = {};
@@ -128,18 +162,169 @@ export default function Dashboard() {
         g.expenses.sort((a, b) => b.amount - a.amount);
       });
 
-      setGroupedData(sortedGroups);
+      // PRESREVE EXPANSION STATE
+      setGroupedData(prev => {
+        const resetGroups = sortedGroups.map(g => {
+          // Find if this category was previously open
+          const prevGroup = prev.find(p => p.category === g.category);
+          if (prevGroup) {
+            return { ...g, isOpen: prevGroup.isOpen };
+          }
+          return g;
+        });
+        return resetGroups;
+      });
+
       setTotalExpense(total);
       setLoading(false);
     });
 
     return () => unsubscribe();
-  }, [currentMonth, expenseDefs, categories]);
+  }, [dateRange, expenseDefs, categories, searchQuery]); // Updated dependency to dateRange
+
+  // Search Effect
+  useEffect(() => {
+    if (!searchQuery.trim()) return;
+
+    const performSearch = async () => {
+      setLoading(true);
+      let allData = allExpensesCache;
+
+      // 1. Fetch All History if not cached
+      if (!allData) {
+        try {
+          // Fetch ALL expenses ordered by date desc
+          // Note: In a real large app, we might limit this, but for personal tracker < 10k docs is fine.
+          const q = query(collection(db, 'expenseDetails'), orderBy('addedDate', 'desc'));
+          const snapshot = await getDocs(q);
+          allData = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as ExpenseDetail));
+          setAllExpensesCache(allData);
+        } catch (error) {
+          console.error("Error fetching history for search:", error);
+          setLoading(false);
+          return;
+        }
+      }
+
+      if (!allData || expenseDefs.length === 0 || categories.length === 0) {
+        setLoading(false);
+        return;
+      }
+
+      // 2. Filter locally
+      const lowerQuery = searchQuery.toLowerCase();
+
+      const filtered = allData.filter(detail => {
+        const expenseDef = expenseDefs.find(e => e.id === detail.expenseId);
+        const name = expenseDef?.name || '';
+        const notes = detail.notes || '';
+
+        const matchesQuery = name.toLowerCase().includes(lowerQuery) || notes.toLowerCase().includes(lowerQuery);
+
+        // Date Logic for Search
+        const expenseDate = detail.addedDate.toDate();
+        const start = startOfMonth(dateRange.start);
+        const end = endOfMonth(dateRange.end);
+        const matchesDate = expenseDate >= start && expenseDate <= end;
+
+        return matchesQuery && matchesDate;
+      }).map(detail => {
+        // Enhance detail same as main logic
+        const expenseDef = expenseDefs.find(e => e.id === detail.expenseId);
+        const categoryDef = categories.find(c => c.id === (expenseDef?.category || detail.category));
+        const categoryName = categoryDef?.name || 'Uncategorized';
+
+        return {
+          ...detail,
+          expenseName: expenseDef?.name || 'Unknown',
+          img: expenseDef?.img || '',
+          categoryName,
+          category: categoryDef?.id
+        };
+      });
+
+      // 3. Group by Month-Year (e.g. "December 2025")
+      const groups: { [key: string]: GroupedExpense } = {};
+      let total = 0;
+
+      filtered.forEach(item => {
+        const date = item.addedDate.toDate();
+        const groupKey = format(date, 'MMMM yyyy'); // "December 2025"
+
+        if (!groups[groupKey]) {
+          groups[groupKey] = {
+            category: groupKey, // Reuse category field for Group Header
+            totalAmount: 0,
+            expenses: [],
+            isOpen: true // Default OPEN for search results so user sees them
+          };
+        }
+        groups[groupKey].totalAmount += item.amount;
+        groups[groupKey].expenses.push(item);
+        total += item.amount;
+      });
+
+      // Sort Groups by Date (descending) - tricky as keys are strings. 
+      // Ideally we sort based on the date of the first item in the group.
+      const sortedGroups = Object.values(groups).sort((a, b) => {
+        // Pick first expense date to compare
+        const dateA = a.expenses[0]?.addedDate.toDate().getTime() || 0;
+        const dateB = b.expenses[0]?.addedDate.toDate().getTime() || 0;
+        return dateB - dateA;
+      });
+
+      // Sort expenses within groups
+      sortedGroups.forEach(g => {
+        g.expenses.sort((a, b) => b.amount - a.amount);
+      });
+
+      setGroupedData(sortedGroups);
+      setTotalExpense(total);
+      setLoading(false);
+    };
+
+    const timeoutId = setTimeout(() => {
+      performSearch();
+    }, 300); // Debounce 300ms
+
+    return () => clearTimeout(timeoutId);
+  }, [searchQuery, expenseDefs, categories, allExpensesCache, dateRange]); // Added dateRange dependency
+
+  // Auto-expand date range when search starts
+  useEffect(() => {
+    if (searchQuery.trim() && filterMode !== 'range') {
+      setFilterMode('range');
+      // Set to a wide range (e.g. Jan 1, 2020 to Now) if user hasn't manually set a wide range?
+      // Actually, user asked to "default to oldest date - latest date".
+      // We can just set it to a fixed "old enough" date for now, or keep current if it's already wide.
+      // Let's set it to 2020 for now as a safe default for this "migrated" app.
+      setDateRange({
+        start: new Date('2020-01-01'),
+        end: new Date()
+      });
+    }
+  }, [searchQuery]); // Run when query changes (checked inside to only act on start)
 
   const toggleGroup = (catName: string) => {
     setGroupedData(prev => prev.map(g =>
       g.category === catName ? { ...g, isOpen: !g.isOpen } : g
     ));
+  };
+
+  const handleDelete = async (id: string, name: string) => {
+    if (confirm(`Are you sure you want to delete "${name}"?`)) {
+      try {
+        await deleteDoc(doc(db, 'expenseDetails', id));
+      } catch (error) {
+        console.error("Error deleting expense:", error);
+        alert("Failed to delete expense.");
+      }
+    }
+  };
+
+  const handleEdit = (expense: ExpenseDetail) => {
+    setEditingExpense(expense);
+    setIsModalOpen(true);
   };
 
   if (!mounted) {
@@ -155,29 +340,86 @@ export default function Dashboard() {
       {/* Header */}
       <div className="sticky top-0 z-10 bg-white/80 backdrop-blur-md border-b border-gray-200 p-4">
         <div className="max-w-3xl mx-auto">
-          <div className="flex justify-between items-center mb-4">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+            <div className="flex items-center gap-3 w-full sm:w-auto overflow-x-auto pb-2 sm:pb-0 px-1">
+              {/* Analytics Toggle */}
+              <button
+                onClick={() => setIsAnalyticsOpen(true)}
+                className="p-2 bg-purple-50 text-purple-600 rounded-lg hover:bg-purple-100 transition-colors border border-purple-200 shrink-0"
+                title="View Analytics"
+              >
+                <PieChartIcon size={20} />
+              </button>
+
+              <button
+                onClick={handleResetDate}
+                className="p-2 bg-gray-50 text-gray-500 rounded-lg hover:bg-gray-100 hover:text-gray-900 transition-colors border border-gray-200 shrink-0"
+                title="Reset to Current Month"
+              >
+                <RotateCcw size={20} />
+              </button>
+            </div>
+
             <h1 className="text-xl font-semibold text-gray-900 tracking-tight">Expense Tracker</h1>
             <button
               onClick={logout}
-              className="p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+              className="p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors shrink-0"
               title="Sign Out"
             >
               <LogOut size={20} strokeWidth={1.5} />
             </button>
           </div>
 
-          <div className="flex items-center justify-between gap-4">
-            <input
-              type="month"
-              className="bg-transparent text-gray-900 p-2 rounded-lg font-medium border border-gray-200 hover:bg-gray-100 focus:ring-2 focus:ring-gray-900 outline-none transition-all cursor-pointer"
-              value={format(currentMonth, 'yyyy-MM')}
-              onChange={(e) => setCurrentMonth(parseISO(e.target.value))}
-            />
-            <div className="flex flex-col items-end">
-              <span className="text-xs text-gray-500 font-medium uppercase tracking-wider">Total</span>
-              <span className="font-semibold text-xl text-gray-900 mt-0.5">Rs. {totalExpense.toLocaleString()}</span>
+          <div className="flex flex-col sm:flex-row gap-4 mb-2">
+            {/* Search Bar */}
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+              <input
+                type="text"
+                placeholder="Search expenses, notes..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full bg-gray-50 border border-gray-200 text-gray-900 pl-10 pr-4 py-2.5 rounded-xl text-sm focus:ring-2 focus:ring-gray-900 focus:border-transparent outline-none transition-all"
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                >
+                  <span className="sr-only">Clear</span>
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+              )}
             </div>
+
+            {/* Date Range or Search - Always visible now for Range adjustment during search */}
+            {/* DateFilter Component replaces manual inputs */}
+            {!searchQuery && (
+              <DateFilter
+                dateRange={dateRange}
+                setDateRange={setDateRange}
+                filterMode={filterMode}
+                setFilterMode={setFilterMode}
+              />
+            )}
+
+            {!searchQuery && (
+              <div className="flex flex-col items-end shrink-0 ml-auto sm:ml-2">
+                <span className="text-xs text-gray-500 font-medium uppercase tracking-wider">Total</span>
+                <span className="font-semibold text-xl text-gray-900 mt-0.5">Rs. {totalExpense.toLocaleString()}</span>
+              </div>
+            )}
           </div>
+
+          {/* Total Display for Search Results */}
+          {searchQuery && (
+            <div className="flex items-center justify-between gap-4 sm:w-auto w-full border-l border-gray-200 pl-4">
+              <div className="flex flex-col items-end shrink-0">
+                <span className="text-xs text-gray-500 font-medium uppercase tracking-wider">Search Total</span>
+                <span className="font-semibold text-xl text-gray-900 mt-0.5">Rs. {totalExpense.toLocaleString()}</span>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -224,9 +466,17 @@ export default function Dashboard() {
                     `}
                   >
                     <div className="flex items-center gap-4">
-                      <div className="h-10 w-10 rounded-lg bg-gray-50 flex items-center justify-center border border-gray-100 overflow-hidden shrink-0">
+                      <div className="relative h-10 w-10 rounded-lg bg-gray-50 flex items-center justify-center border border-gray-100 overflow-hidden shrink-0">
                         {expense.img ? (
-                          <img src={expense.img} alt={expense.expenseName} className="h-full w-full object-cover" />
+                          <Image
+                            src={expense.img}
+                            alt={expense.expenseName}
+                            fill
+                            className="object-cover"
+                            sizes="40px"
+                            quality={75}
+                            loading="lazy"
+                          />
                         ) : (
                           <div className="h-4 w-4 bg-gray-200 rounded-full"></div>
                         )}
@@ -236,11 +486,52 @@ export default function Dashboard() {
                         <div className="flex flex-col sm:flex-row sm:gap-2 text-sm text-gray-500 mt-0.5">
                           <span className={expense.notes ? "" : "hidden"}>{expense.notes}</span>
                           {expense.notes && <span className="hidden sm:inline text-gray-300">•</span>}
+
                           <span>{format(expense.addedDate.toDate(), 'MMM d')}</span>
+                          {expense.bill && expense.bill.length > 0 && (
+                            <>
+                              <span className="hidden sm:inline text-gray-300">•</span>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setViewingBills(expense.bill || []);
+                                  setIsBillModalOpen(true);
+                                }}
+                                className="flex items-center gap-1 text-blue-500 hover:text-blue-700 hover:underline cursor-pointer"
+                              >
+                                <FileIcon size={14} />
+                                <span className="text-xs">{expense.bill.length} Bill{expense.bill.length > 1 ? 's' : ''}</span>
+                              </button>
+                            </>
+                          )}
                         </div>
                       </div>
                     </div>
-                    <span className="font-medium text-gray-900 whitespace-nowrap">Rs. {expense.amount.toLocaleString()}</span>
+                    <div className="flex items-center gap-3">
+                      <span className="font-medium text-gray-900 whitespace-nowrap">Rs. {expense.amount.toLocaleString()}</span>
+                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleEdit(expense);
+                          }}
+                          className="p-2 text-gray-400 hover:text-gray-900 hover:bg-gray-100 rounded-full transition-all active:scale-95"
+                          title="Edit"
+                        >
+                          <Pencil size={18} strokeWidth={1.5} />
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDelete(expense.id, expense.expenseName);
+                          }}
+                          className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-full transition-all active:scale-95"
+                          title="Delete"
+                        >
+                          <Trash2 size={18} strokeWidth={1.5} />
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -251,18 +542,62 @@ export default function Dashboard() {
 
       {/* FAB */}
       <button
-        onClick={() => setIsModalOpen(true)}
+        onClick={() => {
+          setEditingExpense(null);
+          setInitialModalData(null);
+          setIsModalOpen(true);
+        }}
         className="fixed bottom-8 right-8 bg-gray-900 hover:bg-black text-white p-4 rounded-full shadow-lg transition-all hover:scale-105 active:scale-95 border border-transparent hover:shadow-xl z-20"
       >
         <Plus size={24} strokeWidth={2} />
       </button>
 
+      {/* Voice Input */}
+      <VoiceInput
+        existingCategories={categories.map(c => c.name)}
+        existingExpenses={expenseDefs.map(d => ({
+          name: d.name,
+          category: categories.find(c => c.id === d.category)?.name || 'Unknown'
+        }))}
+        onExpenseParsed={(data) => {
+          setEditingExpense(null);
+          setInitialModalData(data);
+          setIsModalOpen(true);
+        }}
+      />
+
       {isModalOpen && (
         <AddExpenseModal
           isOpen={isModalOpen}
-          onClose={() => setIsModalOpen(false)}
+          onClose={() => {
+            setIsModalOpen(false);
+            setEditingExpense(null);
+            setInitialModalData(null);
+          }}
           categories={categories}
           expenseDefs={expenseDefs}
+          editingExpense={editingExpense}
+          initialData={initialModalData}
+        />
+      )
+      }
+
+      <AnalyticsDashboard
+        isOpen={isAnalyticsOpen}
+        onClose={() => setIsAnalyticsOpen(false)}
+        expenses={rawExpenses}
+        dateRange={dateRange}
+        setDateRange={setDateRange}
+        filterMode={filterMode}
+        setFilterMode={setFilterMode}
+      />
+
+      {
+        isBillModalOpen && (
+          <BillViewModal
+            isOpen={isBillModalOpen}
+            onClose={() => setIsBillModalOpen(false)}
+            bills={viewingBills}
         />
       )}
     </div>
