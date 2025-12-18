@@ -186,22 +186,31 @@ export default function AnalyticsDashboard({ isOpen, onClose, expenseDefs, categ
     <div className="fixed inset-0 z-50 flex flex-col bg-white">
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-center justify-between p-4 border-b border-gray-100 bg-white sticky top-0 z-10 gap-4">
-        <div className="flex items-center gap-3 w-full sm:w-auto">
-          <div className={`p-2 rounded-xl text-white bg-blue-600 shadow-sm`}>
-            <PieIcon size={20} />
+        <div className="flex items-center justify-between w-full sm:w-auto gap-3">
+          <div className="flex items-center gap-3">
+            <div className={`p-2 rounded-xl text-white bg-blue-600 shadow-sm`}>
+              <PieIcon size={20} />
+            </div>
+            <div>
+              <h2 className="text-lg font-bold text-gray-900">Analytics</h2>
+              <p className="text-xs text-gray-500 font-medium">
+                {focusedDate
+                  ? `Breakdown for ${focusedDate.type === 'month' ? format(focusedDate.date, 'MMMM yyyy') : format(focusedDate.date, 'dd MMM yyyy')}`
+                  : 'Overview'
+                }
+              </p>
+            </div>
           </div>
-          <div>
-            <h2 className="text-lg font-bold text-gray-900">Analytics</h2>
-            <p className="text-xs text-gray-500 font-medium">
-              {focusedDate
-                ? `Breakdown for ${focusedDate.type === 'month' ? format(focusedDate.date, 'MMMM yyyy') : format(focusedDate.date, 'dd MMM yyyy')}`
-                : 'Overview'
-              }
-            </p>
-          </div>
+
+          <button
+            onClick={onClose}
+            className="sm:hidden p-2 text-gray-400 hover:text-gray-900 hover:bg-gray-100 rounded-full transition-colors"
+          >
+            <X size={24} />
+          </button>
         </div>
 
-        <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-end">
+        <div className="flex items-center gap-2 w-full sm:w-auto justify-center sm:justify-end">
           <DateFilter
             dateRange={dateRange}
             setDateRange={setDateRange}
@@ -211,7 +220,7 @@ export default function AnalyticsDashboard({ isOpen, onClose, expenseDefs, categ
           />
           <button
             onClick={onClose}
-            className="p-2 text-gray-400 hover:text-gray-900 hover:bg-gray-100 rounded-full transition-colors"
+            className="hidden sm:block p-2 text-gray-400 hover:text-gray-900 hover:bg-gray-100 rounded-full transition-colors"
           >
             <X size={24} />
           </button>
