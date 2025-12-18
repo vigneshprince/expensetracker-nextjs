@@ -38,11 +38,11 @@ export default function DateFilter({ dateRange, setDateRange, filterMode, setFil
         </div>
       )}
 
-      <div className="flex items-center gap-1 sm:gap-2 bg-gray-50 border border-gray-200 rounded-lg p-1">
+      <div className="flex items-center gap-1 sm:gap-2 bg-gray-50 border border-gray-200 rounded-lg p-1 flex-shrink-0">
         {filterMode === 'single' ? (
           <input
             type="month"
-            className="bg-transparent text-gray-900 px-1 sm:px-2 py-1 rounded text-xs sm:text-sm font-medium focus:ring-2 focus:ring-gray-900 outline-none cursor-pointer"
+            className="bg-transparent text-gray-900 px-1 sm:px-2 py-1 rounded text-xs sm:text-sm font-medium focus:ring-2 focus:ring-gray-900 outline-none cursor-pointer min-w-[7.5rem] sm:min-w-0"
             value={isValid(dateRange.start) ? format(dateRange.start, 'yyyy-MM') : ''}
             onChange={(e) => {
               if (!e.target.value) return;
@@ -55,7 +55,7 @@ export default function DateFilter({ dateRange, setDateRange, filterMode, setFil
           <>
             <input
               type="month"
-                className="bg-transparent text-gray-900 px-1 sm:px-2 py-1 rounded text-xs sm:text-sm font-medium focus:ring-2 focus:ring-gray-900 outline-none cursor-pointer"
+                className="bg-transparent text-gray-900 px-1 sm:px-2 py-1 rounded text-xs sm:text-sm font-medium focus:ring-2 focus:ring-900 outline-none cursor-pointer min-w-[7.5rem] sm:min-w-0"
               value={isValid(dateRange.start) ? format(dateRange.start, 'yyyy-MM') : ''}
               onChange={(e) => {
                 if (!e.target.value) return;
@@ -63,10 +63,10 @@ export default function DateFilter({ dateRange, setDateRange, filterMode, setFil
               }}
               title="From"
             />
-            <span className="text-gray-400 text-xs font-medium">to</span>
+              <span className="text-gray-400 text-xs font-medium shrink-0">to</span>
             <input
               type="month"
-                className="bg-transparent text-gray-900 px-1 sm:px-2 py-1 rounded text-xs sm:text-sm font-medium focus:ring-2 focus:ring-gray-900 outline-none cursor-pointer"
+                className="bg-transparent text-gray-900 px-1 sm:px-2 py-1 rounded text-xs sm:text-sm font-medium focus:ring-2 focus:ring-900 outline-none cursor-pointer min-w-[7.5rem] sm:min-w-0"
               value={isValid(dateRange.end) ? format(dateRange.end, 'yyyy-MM') : ''}
               onChange={(e) => {
                 if (!e.target.value) return;

@@ -588,7 +588,7 @@ export default function AddExpenseModal({ isOpen, onClose, categories, expenseDe
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="relative">
               <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Category</label>
               <div className="relative">
