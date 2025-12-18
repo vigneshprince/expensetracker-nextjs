@@ -74,9 +74,16 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
   const signInWithGoogle = async () => {
     try {
       const provider = new GoogleAuthProvider();
+      // Force account selection to avoid auto-selecting if that caused issues, though usually not needed.
+      provider.setCustomParameters({ prompt: 'select_account' }); 
       await signInWithPopup(auth, provider);
-    } catch (error) {
+    } catch (error: any) {
+      if (error.code === 'auth/cancelled-popup-request' || error.code === 'auth/popup-closed-by-user') {
+        console.warn("User cancelled login popup.");
+        return; // Ignore cancellation
+      }
       console.error("Error signing in with Google", error);
+      alert("Login failed. Please try again.");
     }
   };
 

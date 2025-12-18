@@ -46,11 +46,12 @@ interface GroupedExpense {
 
 export default function Dashboard() {
   const { user, logout } = useAuth();
+  // Dashboard defaults to Current Month (Single)
   const [dateRange, setDateRange] = useState({
-    start: subMonths(new Date(), 3),
-    end: new Date()
+    start: startOfMonth(new Date()),
+    end: endOfMonth(new Date())
   });
-  const [filterMode, setFilterMode] = useState<'single' | 'range'>('range');
+  const [filterMode, setFilterMode] = useState<'single' | 'range'>('single');
   const [groupedData, setGroupedData] = useState<GroupedExpense[]>([]);
   const [totalExpense, setTotalExpense] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -585,11 +586,8 @@ export default function Dashboard() {
       <AnalyticsDashboard
         isOpen={isAnalyticsOpen}
         onClose={() => setIsAnalyticsOpen(false)}
-        expenses={rawExpenses}
-        dateRange={dateRange}
-        setDateRange={setDateRange}
-        filterMode={filterMode}
-        setFilterMode={setFilterMode}
+        expenseDefs={expenseDefs}
+        categories={categories}
       />
 
       {

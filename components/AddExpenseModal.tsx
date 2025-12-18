@@ -163,7 +163,11 @@ export default function AddExpenseModal({ isOpen, onClose, categories, expenseDe
       }
       setShowCategorySuggestions(false);
 
-      setPreviewUrl('');
+      // Try to find existing image for this expense name
+      const matchingExpense = expenseDefs.find(e =>
+        e.name.toLowerCase() === (initialData.expenseName || '').toLowerCase()
+      );
+      setPreviewUrl(matchingExpense?.img || '');
       setSelectedFile(null);
       setSelectedBillFiles([]);
       setExistingBills([]);
@@ -504,10 +508,23 @@ export default function AddExpenseModal({ isOpen, onClose, categories, expenseDe
                   const lower = val.toLowerCase();
                   const matches = expenseDefs.filter(d =>
                     d.name.toLowerCase().includes(lower) &&
-                    d.name.toLowerCase() !== lower // Don't show if exact match already? Or show anyway?
+                    d.name.toLowerCase() !== lower
                   );
                   setSuggestions(matches);
                   setShowSuggestions(true);
+
+                  // Auto-fill Image & Category if Exact Match found
+                  const exactMatch = expenseDefs.find(d => d.name.toLowerCase() === lower);
+                  if (exactMatch) {
+                    if (exactMatch.img && !selectedFile) {
+                      setPreviewUrl(exactMatch.img);
+                    }
+                    if (exactMatch.category) {
+                      setSelectedCategoryId(exactMatch.category);
+                      const existingCat = categories.find(c => c.id === exactMatch.category);
+                      if (existingCat) setCategorySearch(existingCat.name);
+                    }
+                  }
                 } else {
                   setSuggestions([]);
                   setShowSuggestions(false);
