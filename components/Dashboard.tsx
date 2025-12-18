@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { collection, query, where, onSnapshot, getDocs, Timestamp, orderBy, deleteDoc, doc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { format, isSameMonth, parseISO, isSameDay, subMonths, startOfMonth, endOfMonth } from 'date-fns';
-import { ChevronDown, ChevronUp, Plus, RefreshCw, LogOut, Pencil, Trash2, Search, Calendar, CalendarRange, RotateCcw, PieChart as PieChartIcon } from 'lucide-react';
+import { ChevronDown, ChevronUp, Plus, RefreshCw, LogOut, Pencil, Trash2, Search, Calendar, CalendarRange, RotateCcw, PieChart as PieChartIcon, X as XIcon } from 'lucide-react';
 import AnalyticsDashboard from './AnalyticsDashboard';
 import DateFilter from './DateFilter';
 import { useAuth } from './AuthProvider';
@@ -22,6 +22,8 @@ interface ExpenseDetail {
   notes: string;
   category?: string; // Legacy data might have it, or we join it
   bill?: string[]; // Array of bill URLs
+  expenseName?: string;
+  img?: string;
   // ... other fields
 }
 
@@ -61,6 +63,8 @@ export default function Dashboard() {
   const [viewingBills, setViewingBills] = useState<string[]>([]);
   const [isBillModalOpen, setIsBillModalOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [lastScrollY, setLastScrollY] = useState(0);
+  const [showHeader, setShowHeader] = useState(true);
 
   const [isAnalyticsOpen, setIsAnalyticsOpen] = useState(false); // Analytics State
   const [rawExpenses, setRawExpenses] = useState<any[]>([]); // Flat data for analytics
@@ -81,6 +85,22 @@ export default function Dashboard() {
   // Search State
   const [searchQuery, setSearchQuery] = useState('');
   const [allExpensesCache, setAllExpensesCache] = useState<ExpenseDetail[] | null>(null); // Cache for search
+
+  // Scroll Handler for Hide/Show Header
+  useEffect(() => {
+    const handleScroll = () => {
+      const currentScrollY = window.scrollY;
+      if (currentScrollY > 10 && currentScrollY > lastScrollY) {
+        setShowHeader(false); // Hide on scroll down
+      } else {
+        setShowHeader(true); // Show on scroll up
+      }
+      setLastScrollY(currentScrollY);
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [lastScrollY]);
 
   useEffect(() => {
     setMounted(true);
@@ -337,16 +357,18 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-20 font-sans">
+    <div className="min-h-screen bg-gray-50 pb-48 font-sans">
       {/* Header */}
-      <div className="sticky top-0 z-10 bg-white/80 backdrop-blur-md border-b border-gray-200 p-4">
+      <div className={`sticky top-0 z-10 bg-white/80 backdrop-blur-md border-b border-gray-200 p-4 transition-transform duration-300 ${showHeader ? 'translate-y-0' : '-translate-y-full'}`}>
         <div className="max-w-3xl mx-auto">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-            <div className="flex items-center gap-3 w-full sm:w-auto overflow-x-auto pb-2 sm:pb-0 px-1">
-              {/* Analytics Toggle */}
+          {/* Top Row: Title & Actions */}
+          <div className="flex items-center justify-between gap-4 mb-4">
+            <h1 className="text-xl font-bold text-gray-900 tracking-tight">Expense Tracker</h1>
+
+            <div className="flex items-center gap-2">
               <button
                 onClick={() => setIsAnalyticsOpen(true)}
-                className="p-2 bg-purple-50 text-purple-600 rounded-lg hover:bg-purple-100 transition-colors border border-purple-200 shrink-0"
+                className="p-2 bg-purple-50 text-purple-600 rounded-full hover:bg-purple-100 transition-colors border border-purple-200 shrink-0"
                 title="View Analytics"
               >
                 <PieChartIcon size={20} />
@@ -354,73 +376,75 @@ export default function Dashboard() {
 
               <button
                 onClick={handleResetDate}
-                className="p-2 bg-gray-50 text-gray-500 rounded-lg hover:bg-gray-100 hover:text-gray-900 transition-colors border border-gray-200 shrink-0"
+                className="p-2 bg-gray-100 text-gray-600 rounded-full hover:bg-gray-200 transition-colors border border-gray-200 shrink-0"
                 title="Reset to Current Month"
               >
-                <RotateCcw size={20} />
+                <RotateCcw size={18} />
+              </button>
+
+              <div className="w-px h-6 bg-gray-200 mx-1"></div>
+
+              <button
+                onClick={logout}
+                className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-full transition-colors shrink-0"
+                title="Sign Out"
+              >
+                <LogOut size={20} strokeWidth={1.5} />
               </button>
             </div>
-
-            <h1 className="text-xl font-semibold text-gray-900 tracking-tight">Expense Tracker</h1>
-            <button
-              onClick={logout}
-              className="p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors shrink-0"
-              title="Sign Out"
-            >
-              <LogOut size={20} strokeWidth={1.5} />
-            </button>
           </div>
 
-          <div className="flex flex-col sm:flex-row gap-4 mb-2">
+          {/* Controls Row */}
+          <div className="flex flex-col gap-3">
             {/* Search Bar */}
-            <div className="relative flex-1">
+            <div className="relative w-full">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
               <input
                 type="text"
-                placeholder="Search expenses, notes..."
+                placeholder="Search expenses..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-gray-50 border border-gray-200 text-gray-900 pl-10 pr-4 py-2.5 rounded-xl text-sm focus:ring-2 focus:ring-gray-900 focus:border-transparent outline-none transition-all"
+                className="w-full bg-white border border-gray-200 text-gray-900 pl-10 pr-4 py-2.5 rounded-xl text-sm shadow-sm focus:ring-2 focus:ring-gray-900 focus:border-transparent outline-none transition-all"
               />
               {searchQuery && (
                 <button
                   onClick={() => setSearchQuery('')}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-1"
                 >
                   <span className="sr-only">Clear</span>
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                  <XIcon />
                 </button>
               )}
             </div>
 
-            {/* Date Range or Search - Always visible now for Range adjustment during search */}
-            {/* DateFilter Component replaces manual inputs */}
-            {!searchQuery && (
-              <DateFilter
-                dateRange={dateRange}
-                setDateRange={setDateRange}
-                filterMode={filterMode}
-                setFilterMode={setFilterMode}
-              />
-            )}
-
-            {!searchQuery && (
-              <div className="flex flex-col items-end shrink-0 ml-auto sm:ml-2">
-                <span className="text-xs text-gray-500 font-medium uppercase tracking-wider">Total</span>
-                <span className="font-semibold text-xl text-gray-900 mt-0.5">Rs. {totalExpense.toLocaleString()}</span>
+            {/* Date & Total Row */}
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="sm:w-auto w-full flex justify-center sm:justify-start">
+                {!searchQuery && (
+                  <DateFilter
+                    dateRange={dateRange}
+                    setDateRange={setDateRange}
+                    filterMode={filterMode}
+                    setFilterMode={setFilterMode}
+                    hideModeToggle={false}
+                  />
+                )}
               </div>
-            )}
-          </div>
 
-          {/* Total Display for Search Results */}
-          {searchQuery && (
-            <div className="flex items-center justify-between gap-4 sm:w-auto w-full border-l border-gray-200 pl-4">
-              <div className="flex flex-col items-end shrink-0">
-                <span className="text-xs text-gray-500 font-medium uppercase tracking-wider">Search Total</span>
-                <span className="font-semibold text-xl text-gray-900 mt-0.5">Rs. {totalExpense.toLocaleString()}</span>
+              {/* Total Card */}
+              <div className={`
+                flex items-center gap-3 px-4 py-2 rounded-xl shadow-sm border border-gray-200
+                ${searchQuery ? 'bg-amber-50 border-amber-200 w-full justify-between' : 'bg-white w-full sm:w-auto justify-center sm:justify-start ml-auto'}
+              `}>
+                <span className="text-xs text-gray-500 font-bold uppercase tracking-wider">
+                  {searchQuery ? 'Search Total' : 'Total'}
+                </span>
+                <span className="font-bold text-lg text-gray-900">
+                  Rs. {totalExpense.toLocaleString()}
+                </span>
               </div>
             </div>
-          )}
+          </div>
         </div>
       </div>
 
@@ -461,12 +485,14 @@ export default function Dashboard() {
                 {group.expenses.map((expense, index) => (
                   <div
                     key={expense.id}
+                    onClick={() => handleEdit(expense)}
                     className={`
-                        p-4 flex justify-between items-center hover:bg-gray-50 transition-colors
+                        p-4 flex justify-between items-center hover:bg-gray-50 transition-colors cursor-pointer
                         ${index !== group.expenses.length - 1 ? 'border-b border-gray-100' : ''}
                     `}
                   >
-                    <div className="flex items-center gap-4">
+                    {/* Left: Icon, Name, Date */}
+                    <div className="flex items-center gap-4 flex-1 min-w-0 mr-4">
                       <div className="relative h-10 w-10 rounded-lg bg-gray-50 flex items-center justify-center border border-gray-100 overflow-hidden shrink-0">
                         {expense.img ? (
                           <Image
@@ -482,10 +508,10 @@ export default function Dashboard() {
                           <div className="h-4 w-4 bg-gray-200 rounded-full"></div>
                         )}
                       </div>
-                      <div>
-                        <p className="font-medium text-gray-900">{expense.expenseName}</p>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-gray-900 truncate">{expense.expenseName}</p>
                         <div className="flex flex-col sm:flex-row sm:gap-2 text-sm text-gray-500 mt-0.5">
-                          <span className={expense.notes ? "" : "hidden"}>{expense.notes}</span>
+                          <span className={expense.notes ? "truncate" : "hidden"}>{expense.notes}</span>
                           {expense.notes && <span className="hidden sm:inline text-gray-300">•</span>}
 
                           <span>{format(expense.addedDate.toDate(), 'MMM d')}</span>
@@ -508,9 +534,11 @@ export default function Dashboard() {
                         </div>
                       </div>
                     </div>
-                    <div className="flex items-center gap-3">
+
+                    {/* Right: Amount, Actions */}
+                    <div className="flex items-center gap-3 shrink-0">
                       <span className="font-medium text-gray-900 whitespace-nowrap">Rs. {expense.amount.toLocaleString()}</span>
-                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div className="hidden sm:flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
@@ -548,7 +576,7 @@ export default function Dashboard() {
           setInitialModalData(null);
           setIsModalOpen(true);
         }}
-        className="fixed bottom-8 right-8 bg-gray-900 hover:bg-black text-white p-4 rounded-full shadow-lg transition-all hover:scale-105 active:scale-95 border border-transparent hover:shadow-xl z-20"
+        className="fixed bottom-8 right-8 bg-gray-900/75 backdrop-blur-md hover:bg-black/90 text-white p-4 rounded-full shadow-lg transition-all hover:scale-105 active:scale-95 border border-white/20 hover:shadow-xl z-20"
       >
         <Plus size={24} strokeWidth={2} />
       </button>
@@ -579,6 +607,7 @@ export default function Dashboard() {
           expenseDefs={expenseDefs}
           editingExpense={editingExpense}
           initialData={initialModalData}
+          onDelete={(id) => handleDelete(id, editingExpense?.expenseName || '')}
         />
       )
       }

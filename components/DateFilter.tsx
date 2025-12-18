@@ -13,7 +13,7 @@ interface DateFilterProps {
 
 export default function DateFilter({ dateRange, setDateRange, filterMode, setFilterMode, hideModeToggle }: DateFilterProps) {
   return (
-    <div className="flex flex-wrap items-center gap-2 sm:w-auto w-full">
+    <div className="flex flex-wrap items-center gap-2 justify-center sm:justify-start">
       {!hideModeToggle && (
         <div className="flex bg-gray-100 p-0.5 rounded-lg border border-gray-200">
           <button

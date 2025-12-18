@@ -205,9 +205,9 @@ export default function AnalyticsDashboard({ isOpen, onClose, expenseDefs, categ
           <DateFilter
             dateRange={dateRange}
             setDateRange={setDateRange}
-            filterMode={filterMode}
-            setFilterMode={setFilterMode}
-            hideModeToggle={false}
+            filterMode="range"
+            setFilterMode={() => { }} // No-op as mode is fixed
+            hideModeToggle={true}
           />
           <button
             onClick={onClose}

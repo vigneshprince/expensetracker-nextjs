@@ -5,7 +5,7 @@ import { collection, addDoc, Timestamp, doc, updateDoc } from 'firebase/firestor
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '@/lib/firebase';
 import { searchImagesAction } from '@/app/actions/searchImages';
-import { X, Loader2, Camera, Upload, Paperclip, FileText, ChevronDown, Search } from 'lucide-react';
+import { X, Loader2, Camera, Upload, Paperclip, FileText, ChevronDown, Search, Trash2 } from 'lucide-react';
 import Image from 'next/image';
 
 interface Category {
@@ -40,6 +40,7 @@ interface Props {
   expenseDefs: ExpenseMain[];
   editingExpense?: ExpenseDetail | null;
   initialData?: any; // From Voice
+  onDelete?: (id: string) => void;
 }
 
 const getFileNameFromUrl = (url: string) => {
@@ -57,7 +58,7 @@ const getFileNameFromUrl = (url: string) => {
   }
 };
 
-export default function AddExpenseModal({ isOpen, onClose, categories, expenseDefs, editingExpense, initialData }: Props) {
+export default function AddExpenseModal({ isOpen, onClose, categories, expenseDefs, editingExpense, initialData, onDelete }: Props) {
   const [expenseName, setExpenseName] = useState('');
   const [amount, setAmount] = useState('');
   const [notes, setNotes] = useState('');
@@ -722,6 +723,21 @@ export default function AddExpenseModal({ isOpen, onClose, categories, expenseDe
           </div>
 
           <div className="pt-2 flex gap-3">
+            {editingExpense && onDelete && (
+              <button
+                type="button"
+                onClick={() => {
+                  if (confirm('Are you sure you want to delete this expense?')) {
+                    onDelete(editingExpense.id);
+                    onClose();
+                  }
+                }}
+                className="px-4 py-3 bg-red-50 text-red-600 border border-red-100 rounded-xl font-medium hover:bg-red-100 transition-colors flex items-center justify-center"
+                title="Delete Expense"
+              >
+                <Trash2 size={20} />
+              </button>
+            )}
             <button
               type="button"
               onClick={onClose}

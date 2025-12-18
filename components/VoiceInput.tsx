@@ -106,10 +106,9 @@ export default function VoiceInput({ onExpenseParsed, existingCategories, existi
         onClick={toggleListening}
         disabled={isProcessing}
         className={`
-          fixed bottom-24 right-8 p-4 rounded-full shadow-lg transition-all z-20 flex items-center justify-center
-          ${isListening ? 'bg-red-500 hover:bg-red-600 animate-pulse' : 'bg-blue-600 hover:bg-blue-700'}
-          ${isProcessing ? 'bg-gray-500 cursor-wait' : ''}
-          text-white
+          fixed bottom-24 right-8 p-4 rounded-full shadow-lg transition-all z-20 flex items-center justify-center backdrop-blur-md border border-white/20
+          ${isListening ? 'bg-red-500/75 hover:bg-red-600/90 animate-pulse text-white' : 'bg-blue-600/75 hover:bg-blue-700/90 text-white'}
+          ${isProcessing ? 'bg-gray-500/75 cursor-wait' : ''}
         `}
         title={isListening ? 'Stop Listening' : 'Voice Add Expense'}
       >
