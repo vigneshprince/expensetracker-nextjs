@@ -5,7 +5,7 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 // Initialize Gemini
 // Note: In production, use process.env.GOOGLE_API_KEY
 // For this migration, we'll use the key provided by the user if env is missing, but env is preferred.
-const API_KEY = process.env.GOOGLE_API_KEY || 'AIzaSyDQqu5JMGkjKDrSnyqKZnfI0JpXL-ybiL0';
+const API_KEY = process.env.GOOGLE_API_KEY || '';
 const genAI = new GoogleGenerativeAI(API_KEY);
 
 interface ParseResult {
