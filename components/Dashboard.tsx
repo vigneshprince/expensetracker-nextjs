@@ -151,15 +151,94 @@ export default function Dashboard() {
     fetchStatic();
   }, []);
 
-  useEffect(() => {
+
+
+  const processExpenses = (details: any[]) => {
+    // Process data
+    const processed = details.map(detail => {
+      const expenseDef = expenseDefs.find(e => e.id === detail.expenseId);
+      const categoryDef = categories.find(c => c.id === (expenseDef?.category || detail.category));
+      const categoryName = categoryDef?.name || 'Uncategorized';
+
+      return {
+        ...detail,
+        expenseName: expenseDef?.name || 'Unknown',
+        img: expenseDef?.img || '',
+        categoryName,
+        category: categoryDef?.id
+      };
+    });
+
+    setRawExpenses(processed);
+
+    // Group by Category
+    const groups: { [key: string]: GroupedExpense } = {};
+    let total = 0;
+
+    processed.forEach(item => {
+      if (item.categoryName === 'Investment') return;
+
+      if (!groups[item.categoryName]) {
+        groups[item.categoryName] = {
+          category: item.categoryName,
+          totalAmount: 0,
+          expenses: [],
+          isOpen: false
+        };
+      }
+      groups[item.categoryName].totalAmount += item.amount;
+      groups[item.categoryName].expenses.push(item);
+      total += item.amount;
+    });
+
+    // Convert to array and sort
+    const sortedGroups = Object.values(groups).sort((a, b) => b.totalAmount - a.totalAmount);
+
+    sortedGroups.forEach(g => {
+      g.expenses.sort((a, b) => b.amount - a.amount);
+    });
+
+    setGroupedData(prev => {
+      const resetGroups = sortedGroups.map(g => {
+        const prevGroup = prev.find(p => p.category === g.category);
+        if (prevGroup) {
+          return { ...g, isOpen: prevGroup.isOpen };
+        }
+        return g;
+      });
+      return resetGroups;
+    });
+
+    setTotalExpense(total);
+  };
+
+  const fetchExpenses = async (forceRefresh = false) => {
     if (expenseDefs.length === 0 || categories.length === 0) return;
-    if (searchQuery.trim()) return; // Skip if searching
+    if (searchQuery.trim()) return;
 
     setLoading(true);
     const start = startOfMonth(dateRange.start);
     const end = endOfMonth(dateRange.end);
 
-    // Query expenseDetails
+    // Create Cache Key
+    const cacheKey = `expenses_${start.toISOString()}_${end.toISOString()}_${showRefundsOnly}`;
+    const cachedData = localStorage.getItem(cacheKey);
+    const cachedTimestamp = localStorage.getItem(`${cacheKey}_ts`);
+
+    // Check Cache Validity (1 Hour TTL)
+    if (!forceRefresh && cachedData && cachedTimestamp) {
+      const age = Date.now() - parseInt(cachedTimestamp);
+      if (age < 60 * 60 * 1000) {
+        // Valid Cache
+        console.log("Using Cached Data for", cacheKey);
+        processExpenses(JSON.parse(cachedData));
+        setLoading(false);
+        return;
+      }
+    }
+
+    console.log("Fetching Fresh Data for", cacheKey);
+
     let q;
     if (showRefundsOnly) {
       q = query(
@@ -174,75 +253,47 @@ export default function Dashboard() {
       );
     }
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const details = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as ExpenseDetail));
-
-      // Process data
-      const processed = details.map(detail => {
-        const expenseDef = expenseDefs.find(e => e.id === detail.expenseId);
-        const categoryDef = categories.find(c => c.id === (expenseDef?.category || detail.category)); // Fallback or use joined
-        // Note: Legacy Status.js finds category from expenseDef.category
-
-        const categoryName = categoryDef?.name || 'Uncategorized';
-
+    try {
+      const snapshot = await getDocs(q);
+      const details = snapshot.docs.map(d => {
+        const data = d.data();
         return {
-          ...detail,
-          expenseName: expenseDef?.name || 'Unknown',
-          img: expenseDef?.img || '',
-          categoryName,
-          category: categoryDef?.id // Ensure category ID is resolved for legacy data
-        };
+          id: d.id,
+          ...data,
+          // Handle Timestamp serialization for cache
+          addedDate: data.addedDate // We keep it as is for processing, but need care for JSON
+        } as ExpenseDetail;
       });
 
-      setRawExpenses(processed); // Update raw data for analytics
+      // Serialize for Cache (Convert Timestamps to ISO strings or numbers if needed, but Firestore Timestamps need valid reconstruction)
+      // Actually, for simple JSON stringify, Timestamps become objects. We need to reconstruct them on load.
+      // Let's store raw objects and handle reconstruction in processExpenses if needed, 
+      // OR mostly just use data.
 
-      // Group by Category
-      const groups: { [key: string]: GroupedExpense } = {};
-      let total = 0;
+      // Simple Cache Storage (We might lose Timestamp prototype)
+      // We will reconstruct date in processExpenses if needed or just rely on serialization.
+      // Firestore Timestamps have .seconds. 
 
-      processed.forEach(item => {
-        if (item.categoryName === 'Investment') return; // Filter out Investment if needed like legacy
+      const cacheable = details.map(d => ({
+        ...d,
+        addedDate: { seconds: d.addedDate.seconds, nanoseconds: d.addedDate.nanoseconds }
+      }));
 
-        if (!groups[item.categoryName]) {
-          groups[item.categoryName] = {
-            category: item.categoryName,
-            totalAmount: 0,
-            expenses: [],
-            isOpen: false // Default closed
-          };
-        }
-        groups[item.categoryName].totalAmount += item.amount;
-        groups[item.categoryName].expenses.push(item);
-        total += item.amount;
-      });
+      localStorage.setItem(cacheKey, JSON.stringify(cacheable));
+      localStorage.setItem(`${cacheKey}_ts`, Date.now().toString());
 
-      // Convert to array and sort
-      const sortedGroups = Object.values(groups).sort((a, b) => b.totalAmount - a.totalAmount);
-
-      // Sort expenses within groups
-      sortedGroups.forEach(g => {
-        g.expenses.sort((a, b) => b.amount - a.amount);
-      });
-
-      // PRESREVE EXPANSION STATE
-      setGroupedData(prev => {
-        const resetGroups = sortedGroups.map(g => {
-          // Find if this category was previously open
-          const prevGroup = prev.find(p => p.category === g.category);
-          if (prevGroup) {
-            return { ...g, isOpen: prevGroup.isOpen };
-          }
-          return g;
-        });
-        return resetGroups;
-      });
-
-      setTotalExpense(total);
+      processExpenses(details);
+    } catch (error) {
+      console.error("Error fetching expenses:", error);
+    } finally {
       setLoading(false);
-    });
+    }
+  };
 
-    return () => unsubscribe();
-  }, [dateRange, expenseDefs, categories, searchQuery, showRefundsOnly]); // Updated dependency
+
+  useEffect(() => {
+    fetchExpenses();
+  }, [dateRange, expenseDefs, categories, searchQuery, showRefundsOnly]);
 
   // Search Effect
   useEffect(() => {
@@ -434,6 +485,16 @@ export default function Dashboard() {
               >
                 <PieChartIcon size={20} />
               </button>
+
+              <button
+                onClick={() => fetchExpenses(true)}
+                className="p-2 bg-gray-100 text-gray-600 rounded-full hover:bg-gray-200 transition-colors border border-gray-200 shrink-0"
+                title="Force Refresh Data"
+              >
+                <RefreshCw size={18} />
+              </button>
+
+              <div className="w-px h-6 bg-gray-200 mx-1"></div>
 
               <button
                 onClick={handleResetDate}

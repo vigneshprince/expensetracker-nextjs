@@ -327,14 +327,12 @@ export async function processStagingAction(userEmail: string) {
           "expenseName": "Short Title",
           "date": "YYYY-MM-DD",
           "category": "Suggested Category",
-          "notes": "Sender/Vendor info",
-          "refundRequired": boolean // True if this is a work expense, reimbursement, or personal loan
+          "notes": "Sender/Vendor info"
         }
         
         Rules:
         - If multiple transactions, pick the main one.
         - If NO transaction found, return null (the word null).
-        - Detect if the email implies this is a "reimbursable" expense (e.g. "Work trip", "Project expenses") or implies a personal loan.
       `;
 
       try {

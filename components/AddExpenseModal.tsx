@@ -583,7 +583,21 @@ export default function AddExpenseModal({ isOpen, onClose, categories, expenseDe
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Amount</label>
+            <div className="flex justify-between items-center mb-2">
+              <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider">Amount</label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="refundRequired"
+                  checked={refundRequired}
+                  onChange={(e) => setRefundRequired(e.target.checked)}
+                  className="w-4 h-4 text-gray-900 border-gray-300 rounded focus:ring-gray-900 cursor-pointer"
+                />
+                <label htmlFor="refundRequired" className="text-xs text-gray-700 font-medium cursor-pointer">
+                  Refund Required
+                </label>
+              </div>
+            </div>
             <div className="relative">
               <span className="absolute left-3 top-3.5 text-gray-400 font-medium">Rs.</span>
               <input
@@ -595,19 +609,6 @@ export default function AddExpenseModal({ isOpen, onClose, categories, expenseDe
                 required
               />
             </div>
-          </div>
-
-          <div className="flex items-center gap-2 mt-2">
-            <input
-              type="checkbox"
-              id="refundRequired"
-              checked={refundRequired}
-              onChange={(e) => setRefundRequired(e.target.checked)}
-              className="w-4 h-4 text-gray-900 border-gray-300 rounded focus:ring-gray-900"
-            />
-            <label htmlFor="refundRequired" className="text-sm text-gray-700 font-medium">
-              Refund Required (Reimbursable)
-            </label>
           </div>
 
 
