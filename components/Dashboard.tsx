@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { collection, query, where, onSnapshot, getDocs, Timestamp, orderBy, deleteDoc, doc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { format, isSameMonth, parseISO, isSameDay, subMonths, startOfMonth, endOfMonth } from 'date-fns';
-import { ChevronDown, ChevronUp, Plus, RefreshCw, LogOut, Pencil, Trash2, Search, Calendar, CalendarRange, RotateCcw, PieChart as PieChartIcon, X as XIcon } from 'lucide-react';
+import { ChevronDown, ChevronUp, Plus, RefreshCw, LogOut, Pencil, Trash2, Search, Calendar, CalendarRange, RotateCcw, PieChart as PieChartIcon, X as XIcon, AlertCircle } from 'lucide-react';
 import AnalyticsDashboard from './AnalyticsDashboard';
 import DateFilter from './DateFilter';
 import { useAuth } from './AuthProvider';
@@ -13,6 +13,9 @@ import AddExpenseModal from './AddExpenseModal';
 import { FileText as FileIcon } from 'lucide-react';
 import BillViewModal from './BillViewModal';
 import VoiceInput from './VoiceInput';
+import GmailSyncModal from './GmailSyncModal';
+import { useSearchParams, useRouter } from 'next/navigation';
+import { exchangeAndStoreTokenAction, syncEmailsAction, processStagingAction, checkAutoSyncStatusAction } from '@/app/actions/gmailSync';
 
 interface ExpenseDetail {
   id: string;
@@ -24,7 +27,7 @@ interface ExpenseDetail {
   bill?: string[]; // Array of bill URLs
   expenseName?: string;
   img?: string;
-  // ... other fields
+  refundRequired?: boolean;
 }
 
 interface ExpenseMain {
@@ -68,6 +71,36 @@ export default function Dashboard() {
 
   const [isAnalyticsOpen, setIsAnalyticsOpen] = useState(false); // Analytics State
   const [rawExpenses, setRawExpenses] = useState<any[]>([]); // Flat data for analytics
+  const [showGmailSync, setShowGmailSync] = useState(false);
+  const [activeStagingId, setActiveStagingId] = useState<string | null>(null);
+  const [showRefundsOnly, setShowRefundsOnly] = useState(false);
+
+  const searchParams = useSearchParams();
+  const router = useRouter();
+
+  // Handle OAuth Code Exchange
+  useEffect(() => {
+    const code = searchParams.get('code');
+    if (code && user?.email) {
+      // Remove code from URL immediately to prevent re-trigger
+      router.replace('/dashboard');
+
+      const exchange = async () => {
+        try {
+          const res = await exchangeAndStoreTokenAction(code, user.email || '');
+          if (res.success) {
+            alert("Auto-Sync Enabled successfully!");
+          } else {
+            alert("Failed to enable Auto-Sync: " + res.message);
+          }
+        } catch (e) {
+          console.error(e);
+          alert("Error enabling Auto-Sync");
+        }
+      };
+      exchange();
+    }
+  }, [searchParams, user, router]);
 
   const handleResetDate = () => {
     const now = new Date();
@@ -127,11 +160,19 @@ export default function Dashboard() {
     const end = endOfMonth(dateRange.end);
 
     // Query expenseDetails
-    const q = query(
-      collection(db, 'expenseDetails'),
-      where('addedDate', '>=', start),
-      where('addedDate', '<=', end)
-    );
+    let q;
+    if (showRefundsOnly) {
+      q = query(
+        collection(db, 'expenseDetails'),
+        where('refundRequired', '==', true)
+      );
+    } else {
+      q = query(
+        collection(db, 'expenseDetails'),
+        where('addedDate', '>=', start),
+        where('addedDate', '<=', end)
+      );
+    }
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const details = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as ExpenseDetail));
@@ -201,7 +242,7 @@ export default function Dashboard() {
     });
 
     return () => unsubscribe();
-  }, [dateRange, expenseDefs, categories, searchQuery]); // Updated dependency to dateRange
+  }, [dateRange, expenseDefs, categories, searchQuery, showRefundsOnly]); // Updated dependency
 
   // Search Effect
   useEffect(() => {
@@ -348,6 +389,26 @@ export default function Dashboard() {
     setIsModalOpen(true);
   };
 
+  const handleStagingReview = (item: any, data: any) => {
+    setActiveStagingId(item.id);
+    setInitialModalData(data);
+    setShowGmailSync(false);
+    setIsModalOpen(true);
+  };
+
+  const handleAddSuccess = async () => {
+    if (activeStagingId) {
+      try {
+        await deleteDoc(doc(db, 'mailstaging', activeStagingId));
+        console.log("Deleted staging doc:", activeStagingId);
+      } catch (e) {
+        console.error("Failed to delete staging doc", e);
+      } finally {
+        setActiveStagingId(null);
+      }
+    }
+  };
+
   if (!mounted) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-gray-50">
@@ -380,6 +441,25 @@ export default function Dashboard() {
                 title="Reset to Current Month"
               >
                 <RotateCcw size={18} />
+              </button>
+
+              <button
+                onClick={() => setShowRefundsOnly(!showRefundsOnly)}
+                className={`p-2 rounded-full transition-colors border shrink-0 ${showRefundsOnly ? 'bg-amber-100 text-amber-700 border-amber-300' : 'bg-gray-100 text-gray-600 border-gray-200 hover:bg-gray-200'}`}
+                title="Show Pending Refunds"
+              >
+                <AlertCircle size={18} />
+              </button>
+
+              <div className="w-px h-6 bg-gray-200 mx-1"></div>
+
+              <button
+                onClick={() => setShowGmailSync(true)}
+                className="p-2 text-gray-400 hover:text-gray-900 bg-gray-50 hover:bg-gray-100 rounded-full transition-colors relative group"
+                title="Gmail Sync"
+              >
+                <div className="absolute top-2 right-2 w-2 h-2 bg-blue-500 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                <RefreshCw size={20} />
               </button>
 
               <div className="w-px h-6 bg-gray-200 mx-1"></div>
@@ -535,6 +615,11 @@ export default function Dashboard() {
 
                     {/* Right: Amount, Actions */}
                     <div className="flex items-center gap-3 shrink-0">
+                      {expense.refundRequired && (
+                        <span className="hidden sm:inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800">
+                          Refund Pending
+                        </span>
+                      )}
                       <span className="font-medium text-gray-900 whitespace-nowrap">Rs. {expense.amount.toLocaleString()}</span>
                       <div className="hidden sm:flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                         <button
@@ -606,6 +691,7 @@ export default function Dashboard() {
           editingExpense={editingExpense}
           initialData={initialModalData}
           onDelete={(id) => handleDelete(id, editingExpense?.expenseName || '')}
+          onSuccess={handleAddSuccess}
         />
       )
       }
@@ -615,6 +701,12 @@ export default function Dashboard() {
         onClose={() => setIsAnalyticsOpen(false)}
         expenseDefs={expenseDefs}
         categories={categories}
+      />
+
+      <GmailSyncModal
+        isOpen={showGmailSync}
+        onClose={() => setShowGmailSync(false)}
+        onReview={handleStagingReview}
       />
 
       {

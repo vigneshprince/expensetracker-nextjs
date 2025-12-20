@@ -31,6 +31,7 @@ interface ExpenseDetail {
   expenseName?: string; // Optional for UI
   img?: string; // Optional for UI
   bill?: string[]; // Legacy supports multiple, we'll support at least one for now
+  refundRequired?: boolean;
 }
 
 interface Props {
@@ -41,6 +42,7 @@ interface Props {
   editingExpense?: ExpenseDetail | null;
   initialData?: any; // From Voice
   onDelete?: (id: string) => void;
+  onSuccess?: () => void;
 }
 
 const getFileNameFromUrl = (url: string) => {
@@ -58,7 +60,7 @@ const getFileNameFromUrl = (url: string) => {
   }
 };
 
-export default function AddExpenseModal({ isOpen, onClose, categories, expenseDefs, editingExpense, initialData, onDelete }: Props) {
+export default function AddExpenseModal({ isOpen, onClose, categories, expenseDefs, editingExpense, initialData, onDelete, onSuccess }: Props) {
   const [expenseName, setExpenseName] = useState('');
   const [amount, setAmount] = useState('');
   const [notes, setNotes] = useState('');
@@ -66,6 +68,7 @@ export default function AddExpenseModal({ isOpen, onClose, categories, expenseDe
   const [selectedCategoryId, setSelectedCategoryId] = useState('');
   const [categorySearch, setCategorySearch] = useState('');
   const [showCategorySuggestions, setShowCategorySuggestions] = useState(false);
+  const [refundRequired, setRefundRequired] = useState(false);
 
   // Computed suggestions
   const categorySuggestions = categories.filter(c =>
@@ -131,6 +134,7 @@ export default function AddExpenseModal({ isOpen, onClose, categories, expenseDe
       const foundCat = editingExpense.category ? categories.find(c => c.id === editingExpense.category) : null;
       setSelectedCategoryId(editingExpense.category || '');
       setCategorySearch(foundCat ? foundCat.name : '');
+      setRefundRequired(editingExpense.refundRequired || false);
 
       setPreviewUrl(editingExpense.img || '');
       if (editingExpense.bill && editingExpense.bill.length > 0) {
@@ -163,6 +167,7 @@ export default function AddExpenseModal({ isOpen, onClose, categories, expenseDe
         setCategorySearch(catName);
       }
       setShowCategorySuggestions(false);
+      setRefundRequired(initialData.refundRequired || false);
 
       // Try to find existing image for this expense name
       const matchingExpense = expenseDefs.find(e =>
@@ -185,6 +190,7 @@ export default function AddExpenseModal({ isOpen, onClose, categories, expenseDe
       setSelectedBillFiles([]);
       setExistingBills([]);
       setShowCategorySuggestions(false);
+      setRefundRequired(false);
     }
   }, [editingExpense, initialData, isOpen, categories]);
 
@@ -336,6 +342,7 @@ export default function AddExpenseModal({ isOpen, onClose, categories, expenseDe
           addedDate: Timestamp.fromDate(new Date(date)),
           category: finalCategoryId,
           bill: billUrls,
+          refundRequired: refundRequired,
           // expenseId: currentExpenseId // If point to new definition
         });
         // Update definition if we didn't above? We did above.
@@ -359,10 +366,12 @@ export default function AddExpenseModal({ isOpen, onClose, categories, expenseDe
           addedDate: Timestamp.fromDate(new Date(date)),
           category: finalCategoryId,
           bill: billUrls,
+          refundRequired: refundRequired,
           fav: false
         });
       }
 
+      if (onSuccess) onSuccess();
       onClose();
       // Reset form
       setExpenseName('');
@@ -587,6 +596,20 @@ export default function AddExpenseModal({ isOpen, onClose, categories, expenseDe
               />
             </div>
           </div>
+
+          <div className="flex items-center gap-2 mt-2">
+            <input
+              type="checkbox"
+              id="refundRequired"
+              checked={refundRequired}
+              onChange={(e) => setRefundRequired(e.target.checked)}
+              className="w-4 h-4 text-gray-900 border-gray-300 rounded focus:ring-gray-900"
+            />
+            <label htmlFor="refundRequired" className="text-sm text-gray-700 font-medium">
+              Refund Required (Reimbursable)
+            </label>
+          </div>
+
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="relative">

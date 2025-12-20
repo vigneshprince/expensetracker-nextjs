@@ -15,6 +15,7 @@ interface ParseResult {
   category?: string; // Existing or New
   notes?: string;
   isNewCategory?: boolean;
+  refundRequired?: boolean;
 }
 
 export async function parseExpenseAction(transcript: string, existingCategories: string[], expenseContext: string = ''): Promise<ParseResult> {
@@ -31,6 +32,7 @@ export async function parseExpenseAction(transcript: string, existingCategories:
       - date (YYYY-MM-DD, assume today is ${new Date().toISOString().split('T')[0]})
       - category (Pick valid one from list or suggest a SHORT new one if totally unrelated)
       - notes (any extra details)
+      - refundRequired (boolean, true if user mentions "reimbursable", "refund", "expecting money back", "personal loan", etc.)
 
       User Text: "${transcript}"
 
@@ -60,8 +62,10 @@ export async function parseExpenseAction(transcript: string, existingCategories:
       expenseName: parsed.expenseName ? parsed.expenseName.charAt(0).toUpperCase() + parsed.expenseName.slice(1) : undefined,
       category: parsed.category,
       notes: parsed.notes,
-      isNewCategory: isNew
+      isNewCategory: isNew,
+      refundRequired: parsed.refundRequired
     };
+
 
   } catch (error) {
     console.error("Gemini Parse Error:", error);
