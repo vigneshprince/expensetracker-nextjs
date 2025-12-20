@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { collection, query, where, onSnapshot, getDocs, Timestamp, orderBy, deleteDoc, doc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { format, isSameMonth, parseISO, isSameDay, subMonths, startOfMonth, endOfMonth } from 'date-fns';
-import { ChevronDown, ChevronUp, Plus, RefreshCw, LogOut, Pencil, Trash2, Search, Calendar, CalendarRange, RotateCcw, PieChart as PieChartIcon, X as XIcon, AlertCircle } from 'lucide-react';
+import { ChevronDown, ChevronUp, Plus, RefreshCw, LogOut, Pencil, Trash2, Search, Calendar, CalendarRange, RotateCcw, PieChart as PieChartIcon, X as XIcon, AlertCircle, Mail } from 'lucide-react';
 import AnalyticsDashboard from './AnalyticsDashboard';
 import DateFilter from './DateFilter';
 import { useAuth } from './AuthProvider';
@@ -486,23 +486,7 @@ export default function Dashboard() {
                 <PieChartIcon size={20} />
               </button>
 
-              <button
-                onClick={() => fetchExpenses(true)}
-                className="p-2 bg-gray-100 text-gray-600 rounded-full hover:bg-gray-200 transition-colors border border-gray-200 shrink-0"
-                title="Force Refresh Data"
-              >
-                <RefreshCw size={18} />
-              </button>
 
-              <div className="w-px h-6 bg-gray-200 mx-1"></div>
-
-              <button
-                onClick={handleResetDate}
-                className="p-2 bg-gray-100 text-gray-600 rounded-full hover:bg-gray-200 transition-colors border border-gray-200 shrink-0"
-                title="Reset to Current Month"
-              >
-                <RotateCcw size={18} />
-              </button>
 
               <button
                 onClick={() => setShowRefundsOnly(!showRefundsOnly)}
@@ -515,11 +499,10 @@ export default function Dashboard() {
               <div className="w-px h-6 bg-gray-200 mx-1"></div>
 
               <button
-                onClick={() => setShowGmailSync(true)}
+                onClick={() => fetchExpenses(true)}
                 className="p-2 text-gray-400 hover:text-gray-900 bg-gray-50 hover:bg-gray-100 rounded-full transition-colors relative group"
-                title="Gmail Sync"
+                title="Force Refresh Data"
               >
-                <div className="absolute top-2 right-2 w-2 h-2 bg-blue-500 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"></div>
                 <RefreshCw size={20} />
               </button>
 
@@ -538,6 +521,8 @@ export default function Dashboard() {
           {/* Controls Row */}
           <div className="flex flex-col gap-3">
             {/* Search Bar */}
+            {/* Search and Actions */}
+            <div className="flex gap-2 w-full">
             <div className="relative w-full">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
               <input
@@ -556,6 +541,21 @@ export default function Dashboard() {
                   <XIcon />
                 </button>
               )}
+            </div>
+              <button
+                onClick={handleResetDate}
+                className="p-2.5 bg-gray-100 text-gray-600 rounded-xl hover:bg-gray-200 transition-colors border border-gray-200 shrink-0 shadow-sm"
+                title="Reset to Current Month"
+              >
+                <RotateCcw size={20} />
+              </button>
+              <button
+                onClick={() => setShowGmailSync(true)}
+                className="p-2.5 bg-gray-100 text-gray-600 rounded-xl hover:bg-gray-200 transition-colors border border-gray-200 shrink-0 shadow-sm"
+                title="Gmail Sync"
+              >
+                <Mail size={20} />
+              </button>
             </div>
 
             {/* Date & Total Row */}
