@@ -32,9 +32,11 @@ interface Props {
   isOpen: boolean;
   onClose: () => void;
   onReview: (item: StagingItem, data: ParsedData) => void;
+  categories: { id: string; name: string }[];
+  expenseDefs: { name: string; category: string }[];
 }
 
-export default function GmailSyncModal({ isOpen, onClose, onReview }: Props) {
+export default function GmailSyncModal({ isOpen, onClose, onReview, categories, expenseDefs }: Props) {
   const { user } = useAuth();
   const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState('');
@@ -101,7 +103,13 @@ export default function GmailSyncModal({ isOpen, onClose, onReview }: Props) {
       // So let's update doc to 'pending'.
       await updateDoc(doc(db, 'mailstaging', item.id), { status: 'pending', parsedData: null });
       // Then trigger backend processing
-      await processStagingAction(user.email);
+      const categoryNames = categories.map(c => c.name);
+      const context = expenseDefs.slice(0, 50).map(e => {
+        const catName = categories.find(c => c.id === e.category)?.name || 'Unknown';
+        return `${e.name}: ${catName}`;
+      }).join('\n');
+
+      await processStagingAction(user.email, categoryNames, context);
     } catch (e) {
       console.error("Retry failed", e);
     }
@@ -135,7 +143,12 @@ export default function GmailSyncModal({ isOpen, onClose, onReview }: Props) {
 
             syncEmailsAction(null, user.email!).then(syncRes => {
               if (syncRes.success && (syncRes.count || 0) > 0) {
-                processStagingAction(user.email!);
+                const categoryNames = categories.map(c => c.name);
+                const context = expenseDefs.slice(0, 50).map(e => {
+                  const catName = categories.find(c => c.id === e.category)?.name || 'Unknown';
+                  return `${e.name}: ${catName}`;
+                }).join('\n');
+                processStagingAction(user.email!, categoryNames, context);
               }
               // Refresh status
               checkAutoSyncStatusAction(user.email!).then(status => {
@@ -169,7 +182,12 @@ export default function GmailSyncModal({ isOpen, onClose, onReview }: Props) {
       });
 
       // Process if needed
-      await processStagingAction(user.email);
+      // Process if needed
+      const context = expenseDefs.slice(0, 50).map(e => {
+        const catName = categories.find(c => c.id === e.category)?.name || 'Unknown';
+        return `${e.name}: ${catName}`;
+      }).join('\n');
+      await processStagingAction(user.email, categories.map(c => c.name), context);
 
     } catch (err: any) {
       console.error("Sync Error:", err);

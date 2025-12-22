@@ -283,7 +283,7 @@ export async function syncEmailsAction(accessToken: string | null, userEmail: st
   }
 }
 
-export async function processStagingAction(userEmail: string) {
+export async function processStagingAction(userEmail: string, existingCategories: string[] = [], expenseContext: string = '') {
   if (!GEN_AI_KEY) {
     return { success: false, message: "Missing Gemini API Key" };
   }
@@ -321,18 +321,26 @@ export async function processStagingAction(userEmail: string) {
         Email Content:
         "${content.substring(0, 15000)}" 
 
+        Existing Categories: ${existingCategories.join(', ')}
+
+        HELPFUL PAST CONTEXT (Use to match Merchant -> Category):
+        ${expenseContext}
+
         Return JSON String ONLY (no markdown):
         {
           "amount": number,
           "expenseName": "Short Title",
           "date": "YYYY-MM-DD",
           "category": "Suggested Category",
-          "notes": "Sender/Vendor info"
+          "notes": "Sender/Vendor info",
+          "refundRequired": boolean
         }
         
         Rules:
         - If multiple transactions, pick the main one.
         - If NO transaction found, return null (the word null).
+        - Pick valid category from list if possible, or suggest a new Capitalized one.
+        - Set refundRequired=true if it mentions "reimbursable", "refund", etc.
       `;
 
       try {

@@ -774,6 +774,8 @@ export default function Dashboard() {
         isOpen={showGmailSync}
         onClose={() => setShowGmailSync(false)}
         onReview={handleStagingReview}
+        categories={categories}
+        expenseDefs={expenseDefs}
       />
 
       {
