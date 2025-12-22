@@ -26,6 +26,8 @@ interface StagingItem {
   parsedData?: string; // JSON string
   emailContent?: string;
   userEmail: string;
+  type?: 'email' | 'sms';
+  sender?: string;
 }
 
 interface Props {
@@ -323,6 +325,11 @@ export default function GmailSyncModal({ isOpen, onClose, onReview, categories, 
                         <span className="text-xs text-gray-400">
                           {item.receivedAt ? format(item.receivedAt.toDate(), 'MMM d, h:mm a') : 'Unknown Date'}
                         </span>
+                        {item.type === 'sms' && (
+                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-50 text-blue-600 border border-blue-100">
+                            SMS
+                          </span>
+                        )}
                       </div>
 
                       {parsed ? (
@@ -332,6 +339,11 @@ export default function GmailSyncModal({ isOpen, onClose, onReview, categories, 
                             <span className="text-xs text-gray-500">Rs.</span>
                             <span className="font-bold text-lg">{parsed.amount?.toLocaleString() || '0'}</span>
                           </div>
+                          {item.type === 'sms' && item.sender && (
+                            <p className="text-xs text-blue-600 mt-1 flex items-center gap-1">
+                              <Mail size={10} /> From: <span className="font-medium">{item.sender}</span>
+                            </p>
+                          )}
                           {parsed.category && (
                             <p className="text-xs text-gray-500 mt-1">
                               Category: <span className="font-medium text-gray-700">{parsed.category}</span>
