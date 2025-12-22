@@ -36,8 +36,11 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ success: true, message: 'SMS Staged' });
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('SMS Hook Error:', error);
-    return NextResponse.json({ success: false }, { status: 500 });
+    return NextResponse.json(
+      { success: false, message: error.message || 'Unknown Server Error' },
+      { status: 500 }
+    );
   }
 }
