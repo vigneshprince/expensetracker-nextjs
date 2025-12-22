@@ -231,7 +231,13 @@ export default function Dashboard() {
       if (age < 60 * 60 * 1000) {
         // Valid Cache
         console.log("Using Cached Data for", cacheKey);
-        processExpenses(JSON.parse(cachedData));
+        const parsed = JSON.parse(cachedData);
+        // Reconstruct Timestamps
+        const reconstructed = parsed.map((item: any) => ({
+          ...item,
+          addedDate: new Timestamp(item.addedDate.seconds, item.addedDate.nanoseconds)
+        }));
+        processExpenses(reconstructed);
         setLoading(false);
         return;
       }
