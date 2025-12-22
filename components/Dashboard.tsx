@@ -558,7 +558,7 @@ export default function Dashboard() {
               <button
                 onClick={() => setShowGmailSync(true)}
                 className="p-2.5 bg-gray-100 text-gray-600 rounded-xl hover:bg-gray-200 transition-colors border border-gray-200 shrink-0 shadow-sm"
-                title="Gmail Sync"
+                title="Message Sync"
               >
                 <Mail size={20} />
               </button>

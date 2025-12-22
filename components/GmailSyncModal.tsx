@@ -47,7 +47,7 @@ export default function GmailSyncModal({ isOpen, onClose, onReview, categories, 
   const [snapshot, loading, snapshotError] = useCollection(
     (user?.email && isOpen) ? query(
       collection(db, 'mailstaging'),
-      where('userEmail', '==', user.email),
+      where('userEmail', 'in', [user.email, 'unknown_mobile']),
       orderBy('receivedAt', 'desc')
     ) : null
   );
@@ -56,7 +56,12 @@ export default function GmailSyncModal({ isOpen, onClose, onReview, categories, 
     console.error("Firestore Staging Error:", snapshotError);
   }
 
-  const stagingItems = snapshot?.docs.map(d => ({ id: d.id, ...d.data() } as StagingItem)) || [];
+  const stagingItems = (snapshot?.docs.map(d => ({ id: d.id, ...d.data() } as StagingItem)) || [])
+    .sort((a, b) => {
+      const tA = a.receivedAt?.toMillis() || 0;
+      const tB = b.receivedAt?.toMillis() || 0;
+      return tB - tA; // Newest first
+    });
 
   const handleConnectAndSync = async () => {
     if (!user?.email) return;
@@ -213,7 +218,7 @@ export default function GmailSyncModal({ isOpen, onClose, onReview, categories, 
               <Mail size={20} />
             </div>
             <div>
-              <h2 className="text-lg font-bold text-gray-900">Gmail Sync</h2>
+              <h2 className="text-lg font-bold text-gray-900">Message Sync</h2>
               <p className="text-xs text-gray-500">Sync transactions from your inbox</p>
             </div>
           </div>

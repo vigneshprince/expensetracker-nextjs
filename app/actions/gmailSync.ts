@@ -291,8 +291,9 @@ export async function processStagingAction(userEmail: string, existingCategories
   try {
     const stagingRef = adminDb.collection('mailstaging');
     // Process pending items
+    // Process pending items for this user OR shared SMS (unknown_mobile)
     const snapshot = await stagingRef
-      .where('userEmail', '==', userEmail)
+      .where('userEmail', 'in', [userEmail, 'unknown_mobile'])
       .where('status', '==', 'pending')
       .limit(10)
       .get();
