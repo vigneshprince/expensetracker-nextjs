@@ -170,6 +170,30 @@ export default function GmailSyncModal({ isOpen, onClose, onReview, categories, 
     }
   }, [isOpen, user?.email]);
 
+  // Separate Effect: Auto-Process Pending Items (e.g., SMS)
+  useEffect(() => {
+    if (isOpen && user?.email && stagingItems.length > 0) {
+      const hasPending = stagingItems.some(i => i.status === 'pending');
+      const AUTO_PROCESS_KEY = `gmail_last_auto_process_${user.email}`;
+      const lastProcess = parseInt(localStorage.getItem(AUTO_PROCESS_KEY) || '0');
+      const now = Date.now();
+
+      // Debounce processing: Only if we haven't processed in the last 15 seconds
+      if (hasPending && (now - lastProcess > 15 * 1000)) {
+        console.log("Auto-Process: Found pending items, triggering Gemini...");
+        localStorage.setItem(AUTO_PROCESS_KEY, now.toString());
+
+        const categoryNames = categories.map(c => c.name);
+        const context = expenseDefs.slice(0, 50).map(e => {
+          const catName = categories.find(c => c.id === e.category)?.name || 'Unknown';
+          return `${e.name}: ${catName}`;
+        }).join('\n');
+
+        processStagingAction(user.email, categoryNames, context);
+      }
+    }
+  }, [isOpen, user?.email, stagingItems, categories, expenseDefs]);
+
   const handleSyncNow = async () => {
     if (!user?.email) return;
     setSyncing(true);
